@@ -2,25 +2,62 @@ from __future__ import annotations
 
 from typing import Any
 
-from rdkit import Chem
+import pandas as pd
+from pandas import Series
 
-MAX_SMILES_LENGTH = 100_000
+from core.alerts import find_alerts
+from core.properties import calculate_properties
+from core.rules import evaluate_rules
+from utils.validation import parse_smiles
+
+FREE_TIER_LIMIT = 20
 
 
-def parse_smiles(smiles: Any) -> tuple[Chem.Mol | None, str | None]:
-    """Safely parse a SMILES string and return a helpful validation error."""
-    if not isinstance(smiles, str) or not smiles.strip():
-        return None, "SMILES cannot be empty."
-
-    text = smiles.strip()
-    if len(text) > MAX_SMILES_LENGTH:
-        return None, f"SMILES is too long (maximum {MAX_SMILES_LENGTH} characters)."
-
+def read_smiles_csv(uploaded_file: Any) -> pd.DataFrame:
+    """Read a CSV file and validate that it contains a `smiles` column."""
+    if uploaded_file is None:
+        raise ValueError("A CSV file is required.")
     try:
-        molecule = Chem.MolFromSmiles(text)
-    except (TypeError, ValueError, RuntimeError):
-        molecule = None
+        data = pd.read_csv(uploaded_file)
+    except (pd.errors.ParserError, UnicodeDecodeError) as exc:
+        raise ValueError(f"Could not read CSV: {exc}") from exc
 
-    if molecule is None:
-        return None, "That SMILES could not be parsed. Check the notation and try again."
-    return molecule, None
+    if "smiles" not in data.columns:
+        raise ValueError("Uploaded CSV must contain a 'smiles' column.")
+    return data[["smiles"]].copy()
+
+
+def process_batch_smiles(smiles_series: Series, limit: int = FREE_TIER_LIMIT) -> pd.DataFrame:
+    """Process a series of SMILES strings and return structured results."""
+    if smiles_series is None:
+        raise ValueError("A non-empty series of SMILES strings is required.")
+    if len(smiles_series) > limit:
+        raise ValueError(f"Free tier supports up to {limit} molecules. Reduce the dataset and retry.")
+
+    rows: list[dict[str, Any]] = []
+    for index, value in smiles_series.items():
+        smiles = "" if pd.isna(value) else str(value).strip()
+        molecule, error = parse_smiles(smiles)
+        if molecule is None:
+            rows.append({
+                "index": index,
+                "smiles": smiles,
+                "status": "invalid",
+                "error": error or "Invalid SMILES",
+            })
+            continue
+
+        properties = calculate_properties(molecule)
+        rules = evaluate_rules(molecule)
+        alerts = find_alerts(molecule)
+        rows.append({
+            "index": index,
+            "smiles": smiles,
+            "status": "ok",
+            **{k: v for k, v in properties.items() if not k.endswith("status")},
+            "rules_passed": sum(rule.passed for rule in rules),
+            "alert_count": len(alerts),
+            "error": "",
+        })
+
+    return pd.DataFrame(rows)

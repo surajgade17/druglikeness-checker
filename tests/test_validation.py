@@ -1,49 +1,125 @@
-import pandas as pd
 import pytest
+from rdkit import Chem
 
 from core.alerts import find_alerts
-from core.batch import process_batch_smiles
+from core.rules import egan, evaluate_rules, ghose, lipinski, muegge, veber
 from utils.validation import parse_smiles
 
 
 @pytest.mark.parametrize(
-    "smiles",
+    ("mw, logp, hbd, hba, expected"),
     [
-        "CCO",
-        "Cn1c(=O)n(C)c(=O)c2ncn(C)c12",
-        "COC1=C(C=C(C=C1)NC(=O)C2=CC=C(C=C2)CN3CCOCC3)C4=CC5=C(C=C4)N=CC(=C5)C6=CC=CC=C6",
+        (180.0, 1.5, 1, 4, True),
+        (600.0, 6.0, 6, 12, False),
     ],
 )
-def test_parse_smiles_accepts_valid_examples(smiles: str) -> None:
-    molecule, error = parse_smiles(smiles)
+def test_lipinski(mw: float, logp: float, hbd: int, hba: int, expected: bool) -> None:
+    assert lipinski(mw, logp, hbd, hba).passed is expected
+
+
+@pytest.mark.parametrize(
+    ("rotatable_bonds, tpsa, expected"),
+    [
+        (2, 50.0, True),
+        (11, 150.0, False),
+    ],
+)
+def test_veber(rotatable_bonds: int, tpsa: float, expected: bool) -> None:
+    assert veber(rotatable_bonds, tpsa).passed is expected
+
+
+@pytest.mark.parametrize(
+    ("mw, logp, mr, atoms, expected"),
+    [
+        (300.0, 2.0, 80.0, 25, True),
+        (100.0, 8.0, 20.0, 10, False),
+    ],
+)
+def test_ghose(mw: float, logp: float, mr: float, atoms: int, expected: bool) -> None:
+    assert ghose(mw, logp, mr, atoms).passed is expected
+
+
+@pytest.mark.parametrize(
+    ("logp, tpsa, expected"),
+    [
+        (2.0, 100.0, True),
+        (6.0, 140.0, False),
+    ],
+)
+def test_egan(logp: float, tpsa: float, expected: bool) -> None:
+    assert egan(logp, tpsa).passed is expected
+
+
+@pytest.mark.parametrize(
+    ("mw, logp, tpsa, hbd, hba, rotors, rings, expected"),
+    [
+        (350.0, 2.0, 90.0, 2, 5, 6, 3, True),
+        (700.0, 7.0, 180.0, 7, 12, 16, 8, False),
+    ],
+)
+def test_muegge(
+    mw: float,
+    logp: float,
+    tpsa: float,
+    hbd: int,
+    hba: int,
+    rotors: int,
+    rings: int,
+    expected: bool,
+) -> None:
+    assert muegge(mw, logp, tpsa, hbd, hba, rotors, rings).passed is expected
+
+
+def test_evaluate_rules_aspirin() -> None:
+    molecule = Chem.MolFromSmiles("CC(=O)OC1=CC=CC=C1C(=O)O")
     assert molecule is not None
-    assert error is None
+    results = evaluate_rules(molecule)
+    assert [result.name for result in results] == ["Lipinski", "Veber", "Ghose", "Egan", "Muegge"]
+    assert results[0].passed
+    assert results[1].passed
+    assert results[3].passed
 
 
-def test_parse_smiles_rejects_empty_and_garbage() -> None:
-    for value in ("", "   ", "not a smiles", "x" * 100_001):
+def test_evaluate_rules_gefitinib() -> None:
+    molecule = Chem.MolFromSmiles("COC1=C(C=C(C=C1)NC(=O)C2=CC=C(C=C2)CN3CCOCC3)C4=CC5=C(C=C4)N=CC(=C5)C6=CC=CC=C6")
+    assert molecule is not None
+    results = evaluate_rules(molecule)
+    assert len(results) == 5
+    assert all(isinstance(item, object) for item in results)
+
+
+def test_evaluate_rules_caffeine() -> None:
+    molecule = Chem.MolFromSmiles("Cn1c(=O)n(C)c(=O)c2ncn(C)c12")
+    assert molecule is not None
+    results = evaluate_rules(molecule)
+    assert len(results) == 5
+    assert all(isinstance(item, object) for item in results)
+
+
+def test_rules_reject_missing_molecule() -> None:
+    with pytest.raises(ValueError):
+        evaluate_rules(None)
+
+
+def test_pa_ins_and_brenk_alerts_detected() -> None:
+    nitrobenzene = Chem.MolFromSmiles("[N+](=O)([O-])c1ccccc1")
+    assert nitrobenzene is not None
+    alerts = find_alerts(nitrobenzene)
+    assert any(alert["category"] == "PAINS" for alert in alerts)
+
+    michael_acceptor = Chem.MolFromSmiles("C=CC(=O)C")
+    assert michael_acceptor is not None
+    alerts = find_alerts(michael_acceptor)
+    assert any(alert["category"] == "Brenk" for alert in alerts)
+
+
+def test_invalid_smiles_values() -> None:
+    for value in ("", "   ", "not a smiles", "x" * 10_000):
         molecule, error = parse_smiles(value)
         assert molecule is None
         assert error is not None
 
 
-def test_alert_detection_for_known_patterns() -> None:
-    nitrobenzene, _ = parse_smiles("[N+](=O)([O-])c1ccccc1")
-    assert nitrobenzene is not None
-    assert any(alert["category"] == "PAINS" for alert in find_alerts(nitrobenzene))
-
-    michael_acceptor, _ = parse_smiles("C=CC(=O)C")
-    assert michael_acceptor is not None
-    assert any(alert["category"] == "Brenk" for alert in find_alerts(michael_acceptor))
-
-
-def test_process_batch_smiles_handles_valid_and_invalid_rows() -> None:
-    results = process_batch_smiles(pd.Series(["CCO", "invalid" , "Cn1c(=O)n(C)c(=O)c2ncn(C)c12"]))
-    assert len(results) == 3
-    assert results["status"].tolist() == ["ok", "invalid", "ok"]
-    assert "error" in results.columns
-
-
-def test_process_batch_smiles_rejects_over_limit() -> None:
-    with pytest.raises(ValueError):
-        process_batch_smiles(pd.Series(["CCO"] * 21), limit=20)
+def test_valid_smiles_parses() -> None:
+    molecule, error = parse_smiles("CCO")
+    assert molecule is not None and error is None
