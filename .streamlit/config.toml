@@ -1,16 +1,73 @@
-from utils.validation import parse_smiles
+# DrugLikeness Checker
 
+A mobile-first Streamlit app for evaluating the drug-likeness and basic ADMET-style risk of small molecules directly from a SMILES string or a CSV file.
 
-def test_valid_smiles_parses() -> None:
-    molecule, error = parse_smiles("CCO")
-    assert molecule is not None and error is None
+## Description
 
+DrugLikeness Checker allows a user to paste a SMILES string or upload a CSV with a `smiles` column and instantly receive a report with:
 
-def test_invalid_smiles_returns_friendly_error() -> None:
-    molecule, error = parse_smiles("not a smiles")
-    assert molecule is None and error is not None
+- molecule properties (MW, cLogP, TPSA, HBD, HBA, rotatable bonds, rings, heavy atoms, QED, SA score)
+- rule checks for Lipinski, Veber, Ghose, Egan, and Muegge
+- structural alerts from PAINS and Brenk filters
+- a radar chart and bar chart compared with ideal drug-like ranges
+- batch processing in a free tier
+- an optional Pro stub for larger workloads and advanced features
 
+## Screenshots
 
-def test_empty_smiles_returns_error() -> None:
-    molecule, error = parse_smiles("   ")
-    assert molecule is None and "non-empty" in error
+Placeholder screenshots:
+
+- Single-molecule analysis view
+- Batch CSV upload and results table
+- Pro features panel and comparison charts
+
+## Install
+
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+## Deployment
+
+This app is designed for deployment on Streamlit Community Cloud without extra setup.
+
+1. Push this repository to GitHub.
+2. Create a new app in Streamlit Community Cloud.
+3. Connect the repository and choose `app.py` as the main file.
+4. Ensure `requirements.txt` is present and includes the project dependencies.
+5. Optionally set an environment variable named `DRUGLIKENESS_PRO_KEY` for Pro feature gating.
+
+## Usage
+
+- Paste a SMILES into the single-molecule form.
+- Use the built-in example molecules or upload a CSV with a `smiles` column.
+- Review the pass/fail rule badges and structural alerts.
+- Download batch analysis results as a CSV.
+- For Pro features, provide a valid key to unlock the premium stub.
+
+## Pricing plan
+
+- Free tier: up to 20 molecules per batch
+- Pro tier: up to 5000 molecules, PDF export, and Tanimoto similarity search against a user-provided reference set
+- Payment integration and billing are intentionally left as a TODO in this starter/open-source version.
+
+## Limitations
+
+- This tool is intended for research and educational use only.
+- Structural alerts are heuristic filters; they do not replace medicinal chemistry review.
+- Drug-likeness is not a guarantee of efficacy, safety, or clinical suitability.
+- Some property calculations and alert systems are approximate and should be interpreted with domain expertise.
+
+## Disclaimer
+
+For research and educational use only. Not medical advice.
+
+## Third-party licenses
+
+- RDKit is distributed under a BSD-style open-source license.
+- Streamlit is open-source and used as the application framework.
+- Plotly is open-source and used for interactive visualization.
+- This application is distributed under the MIT license.
