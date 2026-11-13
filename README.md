@@ -1,83 +1,35 @@
-import pytest
-from rdkit import Chem
+# DrugLikeness Checker
 
-from core.rules import egan, evaluate_rules, ghose, lipinski, muegge, veber
+A simple Streamlit application to explore molecular descriptors and drug-likeness filters using SMILES. All demo features are available without a license key.
 
+## Run locally
 
-@pytest.mark.parametrize(
-    ("mw, logp, hbd, hba, expected"),
-    [
-        (180.0, 1.5, 1, 4, True),
-        (600.0, 6.0, 6, 12, False),
-    ],
-)
-def test_lipinski(mw: float, logp: float, hbd: int, hba: int, expected: bool) -> None:
-    assert lipinski(mw, logp, hbd, hba).passed is expected
+Requires Python 3.11 or 3.12 recommended (RDKit wheel support can vary by Python version).
 
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python -m streamlit run app.py
+```
 
-@pytest.mark.parametrize(
-    ("rotatable_bonds, tpsa, expected"),
-    [
-        (2, 50.0, True),
-        (11, 150.0, False),
-    ],
-)
-def test_veber(rotatable_bonds: int, tpsa: float, expected: bool) -> None:
-    assert veber(rotatable_bonds, tpsa).passed is expected
+Open the printed local URL (usually http://localhost:8501). On macOS/Linux, create and activate with `python3 -m venv .venv` and `source .venv/bin/activate`.
 
+## Codespaces
 
-@pytest.mark.parametrize(
-    ("mw, logp, mr, atoms, expected"),
-    [
-        (300.0, 2.0, 80.0, 25, True),
-        (100.0, 8.0, 20.0, 10, False),
-    ],
-)
-def test_ghose(mw: float, logp: float, mr: float, atoms: int, expected: bool) -> None:
-    assert ghose(mw, logp, mr, atoms).passed is expected
+Use Code → Codespaces → Create codespace on main. In its terminal run `python -m pip install -r requirements.txt`, then `python -m streamlit run app.py --server.address 0.0.0.0`. Open forwarded port 8501.
 
+## Features and use
 
-@pytest.mark.parametrize(
-    ("logp, tpsa, expected"),
-    [
-        (2.0, 100.0, True),
-        (6.0, 140.0, False),
-    ],
-)
-def test_egan(logp: float, tpsa: float, expected: bool) -> None:
-    assert egan(logp, tpsa).passed is expected
+- Paste SMILES or select aspirin, gefitinib, or erlotinib, then click Analyze.
+- View 2D structure, descriptors, rule checks, alerts, and a Plotly chart.
+- Upload a CSV with a `smiles` column; demo batch size is capped at 5,000 rows and results are downloadable.
+- No license key is required; payment integration is not implemented.
 
+## Limitations
 
-@pytest.mark.parametrize(
-    ("mw, logp, tpsa, hbd, hba, rotors, rings, expected"),
-    [
-        (350.0, 2.0, 90.0, 2, 5, 6, 3, True),
-        (700.0, 7.0, 180.0, 7, 12, 16, 8, False),
-    ],
-)
-def test_muegge(
-    mw: float,
-    logp: float,
-    tpsa: float,
-    hbd: int,
-    hba: int,
-    rotors: int,
-    rings: int,
-    expected: bool,
-) -> None:
-    assert muegge(mw, logp, tpsa, hbd, hba, rotors, rings).passed is expected
+For research and educational use only. Not medical advice. Descriptors and rule filters are heuristics, not efficacy, toxicity, or clinical predictions. SA score is optional and may show unavailable if RDKit Contrib is absent. Structural alerts need expert interpretation.
 
+## License
 
-def test_evaluate_rules_aspirin() -> None:
-    molecule = Chem.MolFromSmiles("CC(=O)OC1=CC=CC=C1C(=O)O")
-    assert molecule is not None
-    results = evaluate_rules(molecule)
-    assert [result.name for result in results] == ["Lipinski", "Veber", "Ghose", "Egan", "Muegge"]
-    assert results[0].passed
-    assert results[1].passed
-    assert results[3].passed
-
-
-def test_rules_reject_missing_molecule() -> None:
-    with pytest.raises(ValueError):
-        evaluate_rules(None)
+Application code is MIT licensed. RDKit is BSD-licensed; Streamlit and pandas are BSD-licensed; Plotly is MIT-licensed. Refer to upstream projects for complete third-party notices.
