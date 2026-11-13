@@ -8,7 +8,7 @@ MAX_SMILES_LENGTH = 100_000
 
 
 def parse_smiles(smiles: Any) -> tuple[Chem.Mol | None, str | None]:
-    """Safely parse a SMILES string and return a helpful validation error."""
+    """Safely parse a SMILES string and return a useful validation error."""
     if not isinstance(smiles, str) or not smiles.strip():
         return None, "SMILES cannot be empty."
 

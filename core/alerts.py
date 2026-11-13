@@ -1,3 +1,4 @@
+"""Rule-of-five and complementary oral drug-likeness filters."""
 from __future__ import annotations
 
 from dataclasses import dataclass

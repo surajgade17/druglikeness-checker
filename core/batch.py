@@ -16,7 +16,7 @@ IDEAL_RANGES: dict[str, tuple[float, float]] = {
 
 
 def build_radar_chart(metrics: dict[str, Any]) -> go.Figure:
-    """Build a radar chart comparing the molecule to ideal ranges."""
+    """Build a radar chart comparing a molecule to ideal ranges."""
     categories = ["MW", "cLogP", "TPSA", "HBD", "HBA", "RotB"]
     current_values = [
         float(metrics.get("Molecular weight", 0.0)),
@@ -29,26 +29,8 @@ def build_radar_chart(metrics: dict[str, Any]) -> go.Figure:
     ideal_values = [500.0, 5.6, 140.0, 5.0, 10.0, 10.0]
 
     fig = go.Figure()
-    fig.add_trace(
-        go.Scatterpolar(
-            r=current_values,
-            theta=categories,
-            fill="toself",
-            name="Molecule",
-            line_color="#2563eb",
-            fillcolor="rgba(37, 99, 235, 0.25)",
-        )
-    )
-    fig.add_trace(
-        go.Scatterpolar(
-            r=ideal_values,
-            theta=categories,
-            fill="toself",
-            name="Ideal range",
-            line_color="#10b981",
-            fillcolor="rgba(16, 185, 129, 0.1)",
-        )
-    )
+    fig.add_trace(go.Scatterpolar(r=current_values, theta=categories, fill="toself", name="Molecule", line_color="#2563eb", fillcolor="rgba(37, 99, 235, 0.25)"))
+    fig.add_trace(go.Scatterpolar(r=ideal_values, theta=categories, fill="toself", name="Ideal range", line_color="#10b981", fillcolor="rgba(16, 185, 129, 0.1)"))
     fig.update_layout(
         polar=dict(radialaxis=dict(visible=True, range=[0, max(ideal_values) * 1.1])),
         template="plotly_white",
@@ -59,7 +41,7 @@ def build_radar_chart(metrics: dict[str, Any]) -> go.Figure:
 
 
 def build_bar_chart(metrics: dict[str, Any]) -> go.Figure:
-    """Build a grouped comparator bar chart."""
+    """Build a grouped bar chart of molecule values versus ideal limits."""
     properties = [
         ("Molecular weight", "MW", 500.0),
         ("cLogP", "cLogP", 5.6),
@@ -76,16 +58,9 @@ def build_bar_chart(metrics: dict[str, Any]) -> go.Figure:
         values.append(float(metrics.get(name, 0.0)))
         limits.append(float(ideal_limit))
 
-    fig = go.Figure(
-        data=[
-            go.Bar(name="Molecule", x=labels, y=values, marker_color="#2563eb"),
-            go.Bar(name="Ideal limit", x=labels, y=limits, marker_color="#10b981"),
-        ]
-    )
-    fig.update_layout(
-        template="plotly_white",
-        barmode="group",
-        height=400,
-        margin=dict(l=20, r=20, t=20, b=20),
-    )
+    fig = go.Figure(data=[
+        go.Bar(name="Molecule", x=labels, y=values, marker_color="#2563eb"),
+        go.Bar(name="Ideal limit", x=labels, y=limits, marker_color="#10b981"),
+    ])
+    fig.update_layout(template="plotly_white", barmode="group", height=400, margin=dict(l=20, r=20, t=20, b=20))
     return fig

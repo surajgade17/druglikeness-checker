@@ -7,7 +7,7 @@ from rdkit.Chem import Descriptors, Lipinski, QED, rdMolDescriptors
 
 
 def calculate_properties(molecule: Chem.Mol) -> dict[str, Any]:
-    """Return common 2D molecular descriptors used by the app."""
+    """Return common 2D molecular descriptors used in the app."""
     if molecule is None:
         raise ValueError("A valid RDKit molecule is required.")
 

@@ -1,4 +1,4 @@
-"""DrugLikeness Checker: lightweight Streamlit molecular screening demo."""
+"""DrugLikeness Checker: Streamlit UI only."""
 from __future__ import annotations
 
 from io import BytesIO
@@ -28,7 +28,7 @@ EXAMPLE_SMILES: dict[str, str] = {
 
 @st.cache_data(show_spinner=False)
 def analyze_smiles(smiles: str) -> dict[str, Any]:
-    """Calculate descriptors, rules, and structural alerts for one molecule."""
+    """Run analysis for a single SMILES input."""
     molecule, error = parse_smiles(smiles)
     if molecule is None:
         return {"error": error or "Invalid SMILES."}
@@ -37,8 +37,8 @@ def analyze_smiles(smiles: str) -> dict[str, Any]:
         "molecule": molecule,
         "properties": calculate_properties(molecule),
         "rules": [
-            {"name": item.name, "passed": item.passed, "details": item.details, "violations": item.violations}
-            for item in evaluate_rules(molecule)
+            {"name": result.name, "passed": result.passed, "details": result.details, "violations": result.violations}
+            for result in evaluate_rules(molecule)
         ],
         "alerts": find_alerts(molecule),
         "canonical_smiles": Chem.MolToSmiles(molecule),
@@ -47,91 +47,82 @@ def analyze_smiles(smiles: str) -> dict[str, Any]:
 
 @st.cache_data(show_spinner=False)
 def prepare_molecule_image(smiles: str) -> bytes:
-    """Render a PNG structure image."""
+    """Render a PNG image of a molecule."""
     molecule, error = parse_smiles(smiles)
     if molecule is None:
-        raise ValueError(error or "Invalid SMILES.")
-    image = Draw.MolToImage(molecule, size=(500, 350))
+        raise ValueError(error or "Invalid SMILES provided to image generation.")
+    png_image = Draw.MolToImage(molecule, size=(500, 350))
     buffer = BytesIO()
-    image.save(buffer, format="PNG")
+    png_image.save(buffer, format="PNG")
     return buffer.getvalue()
 
 
 def render_single_molecule() -> None:
     """Single-molecule analysis UI."""
     st.subheader("Single molecule")
-    example_names = ["Custom input", *EXAMPLE_SMILES.keys()]
-    selected = st.selectbox("Try an example molecule", example_names)
+    example_names = ["Custom input", *list(EXAMPLE_SMILES.keys())]
+    selected = st.selectbox("Use an example molecule", example_names, index=0)
     default_smiles = EXAMPLE_SMILES.get(selected, "") if selected != "Custom input" else "CCO"
-    smiles = st.text_area("SMILES", value=default_smiles, height=110)
+    smiles_input = st.text_area("SMILES", value=default_smiles, height=120, help="Paste a valid SMILES string.")
 
-    if not st.button("Analyze molecule", type="primary") and not smiles.strip():
-        return
+    if st.button("Analyze molecule", type="primary") or smiles_input.strip():
+        result = analyze_smiles(smiles_input)
+        if "error" in result:
+            st.error(result["error"])
+            return
 
-    result = analyze_smiles(smiles)
-    if "error" in result:
-        st.error(result["error"])
-        return
+        st.image(prepare_molecule_image(smiles_input), caption="2D structure", use_container_width=True)
+        st.caption(f"Canonical SMILES: `{result['canonical_smiles']}`")
 
-    st.markdown("### Structure")
-    st.image(prepare_molecule_image(smiles), caption="2D structure", use_container_width=True)
-    st.caption(f"Canonical SMILES: `{result['canonical_smiles']}`")
+        props = result["properties"]
+        for index in range(0, len(props.items()), 2):
+            cols = st.columns(2)
+            current_items = list(props.items())[index:index + 2]
+            for col, (name, value) in zip(cols, current_items):
+                col.metric(name, value if value is not None else "N/A")
 
-    properties = result["properties"]
-    property_items = list(properties.items())
-    for start in range(0, len(property_items), 2):
-        cols = st.columns(2)
-        for col, (label, value) in zip(cols, property_items[start:start + 2]):
-            col.metric(label, "N/A" if value is None else value)
+        st.markdown("### Drug-likeness rules")
+        for rule in result["rules"]:
+            status = "✅ PASS" if rule["passed"] else "❌ FAIL"
+            st.markdown(f"{status} **{rule['name']}** — {rule['details']}")
 
-    st.markdown("### Drug-likeness rules")
-    for rule in result["rules"]:
-        status = "✅ PASS" if rule["passed"] else "❌ FAIL"
-        st.markdown(f"{status} **{rule['name']}** — {rule['details']}")
+        st.markdown("### Alerts")
+        if result["alerts"]:
+            for entry in result["alerts"]:
+                st.warning(f"{entry['category']}: {entry['alert']} | substructure: `{entry['matched_substructure']}`")
+        else:
+            st.success("No PAINS or Brenk alerts were matched.")
 
-    st.markdown("### Alerts")
-    if result["alerts"]:
-        for alert in result["alerts"]:
-            st.warning(f"{alert['category']}: {alert['alert']}")
-    else:
-        st.success("No PAINS or Brenk alerts were matched.")
-
-    st.markdown("### Comparison charts")
-    st.plotly_chart(build_radar_chart(properties), use_container_width=True)
-    st.plotly_chart(build_bar_chart(properties), use_container_width=True)
+        st.markdown("### Comparison charts")
+        st.plotly_chart(build_radar_chart(props), use_container_width=True)
+        st.plotly_chart(build_bar_chart(props), use_container_width=True)
 
 
 def render_batch_mode() -> None:
-    """Batch CSV input and results UI."""
-    st.subheader("Batch CSV")
+    """Batch CSV UI."""
+    st.subheader("Batch mode")
     st.caption(f"Upload a CSV with a `smiles` column. Free tier limit: {FREE_TIER_LIMIT} molecules.")
     uploaded = st.file_uploader("Choose CSV", type=["csv"])
     if uploaded is None:
         return
 
     try:
-        frame = read_smiles_csv(uploaded)
-        results = process_batch_smiles(frame["smiles"], limit=FREE_TIER_LIMIT)
+        raw_df = read_smiles_csv(uploaded)
+        results = process_batch_smiles(raw_df["smiles"], limit=FREE_TIER_LIMIT)
     except (ValueError, pd.errors.ParserError, UnicodeDecodeError) as exc:
         st.error(str(exc))
         return
 
-    st.dataframe(results, use_container_width=True, hide_index=True)
-    st.download_button(
-        "Download results CSV",
-        results.to_csv(index=False).encode("utf-8"),
-        "druglikeness_results.csv",
-        "text/csv",
-        use_container_width=True,
-    )
+    st.dataframe(results, use_container_width=True)
+    csv_data = results.to_csv(index=False).encode("utf-8")
+    st.download_button("Download results CSV", csv_data, "druglikeness_results.csv", "text/csv", use_container_width=True)
 
 
 def main() -> None:
-    """App entry point."""
+    """Main app entry point."""
     st.title("💊 DrugLikeness Checker")
-    st.caption("Quick molecular property screening from SMILES.")
+    st.caption("Quick molecular property screening from SMILES")
     st.info("For research and educational use only. Not medical advice.")
-
     render_single_molecule()
     st.divider()
     render_batch_mode()
