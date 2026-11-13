@@ -1,6 +1,7 @@
 import pytest
 from rdkit import Chem
 
+from core.alerts import find_alerts
 from core.rules import egan, evaluate_rules, ghose, lipinski, muegge, veber
 from utils.validation import parse_smiles
 
@@ -79,9 +80,31 @@ def test_evaluate_rules_aspirin() -> None:
     assert results[3].passed
 
 
+def test_evaluate_rules_gefitinib() -> None:
+    molecule = Chem.MolFromSmiles("COC1=C(C=C(C=C1)NC(=O)C2=CC=C(C=C2)CN3CCOCC3)C4=CC5=C(C=C4)N=CC(=C5)C6=CC=CC=C6")
+    assert molecule is not None
+    results = evaluate_rules(molecule)
+    assert len(results) == 5
+    assert all(isinstance(item, object) for item in results)
+
+
+def test_evaluate_rules_caffeine() -> None:
+    molecule = Chem.MolFromSmiles("Cn1c(=O)n(C)c(=O)c2ncn(C)c12")
+    assert molecule is not None
+    results = evaluate_rules(molecule)
+    assert len(results) == 5
+    assert all(isinstance(item, object) for item in results)
+
+
 def test_rules_reject_missing_molecule() -> None:
     with pytest.raises(ValueError):
         evaluate_rules(None)
+
+
+def test_paing_and_brenk_alerts_detected() -> None:
+    molecule = Chem.MolFromSmiles("[N+](=O)([O-])c1ccccc1")
+    alerts = find_alerts(molecule)
+    assert any(alert["category"] == "PAINS" for alert in alerts)
 
 
 def test_valid_smiles_parses() -> None:
@@ -90,8 +113,10 @@ def test_valid_smiles_parses() -> None:
 
 
 def test_invalid_smiles_returns_friendly_error() -> None:
-    molecule, error = parse_smiles("not a smiles")
-    assert molecule is None and error is not None
+    for bad_smiles in ["not a smiles", "", "   ", "x" * 4096]:
+        molecule, error = parse_smiles(bad_smiles)
+        assert molecule is None
+        assert error is not None
 
 
 def test_empty_smiles_returns_error() -> None:
