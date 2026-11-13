@@ -1,25 +1,16 @@
-from __future__ import annotations
-
-from typing import Optional
-
-from rdkit import Chem
+from utils.validation import parse_smiles
 
 
-def parse_smiles(smiles: object) -> tuple[Optional[Chem.Mol], Optional[str]]:
-    """Parse a SMILES string and return a friendly validation error when needed."""
-    if not isinstance(smiles, str):
-        return None, "Enter a valid SMILES string."
+def test_valid_smiles_parses() -> None:
+    molecule, error = parse_smiles("CCO")
+    assert molecule is not None and error is None
 
-    cleaned = smiles.strip()
-    if not cleaned:
-        return None, "Enter a non-empty SMILES string."
 
-    try:
-        molecule = Chem.MolFromSmiles(cleaned)
-    except (TypeError, ValueError, RuntimeError) as exc:
-        return None, f"This SMILES could not be parsed: {exc}"
+def test_invalid_smiles_returns_friendly_error() -> None:
+    molecule, error = parse_smiles("not a smiles")
+    assert molecule is None and error is not None
 
-    if molecule is None:
-        return None, "This does not appear to be a valid SMILES string. Check the notation and try again."
 
-    return molecule, None
+def test_empty_smiles_returns_error() -> None:
+    molecule, error = parse_smiles("   ")
+    assert molecule is None and "non-empty" in error
