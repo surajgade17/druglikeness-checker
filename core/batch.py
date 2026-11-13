@@ -2,65 +2,45 @@ from __future__ import annotations
 
 from typing import Any
 
-import plotly.graph_objects as go
+import pandas as pd
+from pandas import Series
+
+from core.alerts import find_alerts
+from core.properties import calculate_properties
+from core.rules import evaluate_rules
+from utils.validation import parse_smiles
+
+FREE_TIER_LIMIT = 20
 
 
-IDEAL_RANGES: dict[str, tuple[float, float]] = {
-    "Molecular weight": (200.0, 500.0),
-    "cLogP": (-0.4, 5.6),
-    "TPSA": (20.0, 140.0),
-    "HBD": (0.0, 5.0),
-    "HBA": (0.0, 10.0),
-    "Rotatable bonds": (0.0, 10.0),
-}
+def read_smiles_csv(uploaded_file: Any) -> pd.DataFrame:
+    """Read CSV data and require a column named smiles."""
+    if uploaded_file is None:
+        raise ValueError("A CSV file is required.")
+    try:
+        dataframe = pd.read_csv(uploaded_file)
+    except (pd.errors.ParserError, UnicodeDecodeError) as exc:
+        raise ValueError(f"Could not read CSV: {exc}") from exc
+    if "smiles" not in dataframe.columns:
+        raise ValueError("Uploaded CSV must contain a 'smiles' column.")
+    return dataframe[["smiles"]].copy()
 
 
-def build_radar_chart(metrics: dict[str, Any]) -> go.Figure:
-    """Build a radar chart comparing the molecule to typical drug-like ranges."""
-    categories = ["MW", "cLogP", "TPSA", "HBD", "HBA", "RotB"]
-    current_values = [
-        float(metrics.get("Molecular weight", 0.0)),
-        float(metrics.get("cLogP", 0.0)),
-        float(metrics.get("TPSA", 0.0)),
-        float(metrics.get("HBD", 0.0)),
-        float(metrics.get("HBA", 0.0)),
-        float(metrics.get("Rotatable bonds", 0.0)),
-    ]
-    ideal_values = [500.0, 5.6, 140.0, 5.0, 10.0, 10.0]
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatterpolar(r=current_values, theta=categories, fill="toself", name="Molecule", line_color="#2563eb", fillcolor="rgba(37, 99, 235, 0.25)"))
-    fig.add_trace(go.Scatterpolar(r=ideal_values, theta=categories, fill="toself", name="Ideal range", line_color="#10b981", fillcolor="rgba(16, 185, 129, 0.1)"))
-    fig.update_layout(
-        polar=dict(radialaxis=dict(visible=True, range=[0, max(ideal_values) * 1.1])),
-        template="plotly_white",
-        height=400,
-        margin=dict(l=20, r=20, t=20, b=20),
-    )
-    return fig
-
-
-def build_bar_chart(metrics: dict[str, Any]) -> go.Figure:
-    """Build a bar chart compared against the ideal ranges."""
-    properties = [
-        ("Molecular weight", "MW", 500.0),
-        ("cLogP", "cLogP", 5.6),
-        ("TPSA", "TPSA", 140.0),
-        ("HBD", "HBD", 5.0),
-        ("HBA", "HBA", 10.0),
-        ("Rotatable bonds", "RotB", 10.0),
-    ]
-    labels: list[str] = []
-    values: list[float] = []
-    limits: list[float] = []
-    for name, short_name, ideal_limit in properties:
-        labels.append(short_name)
-        values.append(float(metrics.get(name, 0.0)))
-        limits.append(float(ideal_limit))
-
-    fig = go.Figure(data=[
-        go.Bar(name="Molecule", x=labels, y=values, marker_color="#2563eb"),
-        go.Bar(name="Ideal limit", x=labels, y=limits, marker_color="#10b981"),
-    ])
-    fig.update_layout(template="plotly_white", barmode="group", height=400, margin=dict(l=20, r=20, t=20, b=20))
-    return fig
+def process_batch_smiles(smiles_series: Series, limit: int = FREE_TIER_LIMIT) -> pd.DataFrame:
+    """Calculate descriptors, rules, and alerts for each input SMILES."""
+    if smiles_series is None:
+        raise ValueError("A series of SMILES strings is required.")
+    if len(smiles_series) > limit:
+        raise ValueError(f"Batch supports up to {limit} molecules. Reduce the dataset and retry.")
+    rows: list[dict[str, Any]] = []
+    for index, value in smiles_series.items():
+        smiles = "" if pd.isna(value) else str(value).strip()
+        molecule, error = parse_smiles(smiles)
+        if molecule is None:
+            rows.append({"index": index, "smiles": smiles, "status": "invalid", "error": error or "Invalid SMILES"})
+            continue
+        properties = calculate_properties(molecule)
+        rules = evaluate_rules(molecule)
+        alerts = find_alerts(molecule)
+        rows.append({"index": index, "smiles": smiles, "status": "ok", **{k: v for k, v in properties.items() if not k.endswith("status")}, "rules passed": sum(rule.passed for rule in rules), "alert count": len(alerts), "error": ""})
+    return pd.DataFrame(rows)
