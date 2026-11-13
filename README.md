@@ -1,2 +1,10 @@
-# druglikeness-checker
-Mobile-first Streamlit app for molecular drug-likeness and basic structure-alert screening using RDKit.
+[server]
+headless = true
+enableCORS = false
+enableXsrfProtection = true
+
+[theme]
+primaryColor = "#2563eb"
+backgroundColor = "#f8fafc"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#0f172a"

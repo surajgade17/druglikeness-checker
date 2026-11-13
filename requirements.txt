@@ -1,6 +1,77 @@
-streamlit>=1.36,<2.0
-rdkit>=2024.3.1
-pandas>=2.0
-plotly>=5.20
-reportlab>=4.0
-pytest>=8.0
+# DrugLikeness Checker
+
+A mobile-first Streamlit app for quickly evaluating drug-likeness and basic ADMET-style flags from a SMILES string or a CSV of SMILES.
+
+## Features
+
+- Single-molecule SMILES input with example molecules
+- CSV upload support with a required `smiles` column
+- Friendly validation for invalid SMILES
+- 2D molecule rendering
+- Molecular property summaries (MW, cLogP, TPSA, HBD, HBA, rotatable bonds, rings, heavy atoms, QED, SA score)
+- Rule checks for Lipinski, Veber, Ghose, Egan, and Muegge
+- PAINS/Brenk alert detection with matched SMARTS patterns
+- Plotly radar and bar charts against ideal drug-like ranges
+- Batch analysis with free-tier limit of 20 molecules
+- Pro stub for larger workloads, PDF export, and Tanimoto similarity search behind a license key flag
+- Research-only disclaimer
+
+## Screenshots
+
+Placeholder for screenshots:
+
+- Single-molecule analysis
+- Batch CSV table
+- Pro features section
+
+## Install
+
+```bash
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+## Deployment
+
+This project is designed to deploy on Streamlit Community Cloud with no additional setup beyond the repository and `requirements.txt`.
+
+Typical deployment steps:
+
+1. Push this repository to GitHub.
+2. Create a new app on Streamlit Community Cloud pointed to the repository.
+3. Set the app file to `app.py`.
+4. Ensure `requirements.txt` includes the dependencies.
+5. Optionally set a `DRUGLIKENESS_PRO_KEY` environment variable for Pro feature gating.
+
+## Usage
+
+- Enter a single SMILES in the input field.
+- Use the example molecules or upload a CSV with a `smiles` column.
+- Review rule pass/fail badges and the structural alerts output.
+- Download batch results as CSV.
+
+## Pricing plan
+
+- Free tier: up to 20 molecules per batch
+- Pro: up to 5000 molecules, PDF export, and Tanimoto similarity search
+- Payment integration is intentionally left as a TODO and is not implemented in this open-source starter repo.
+
+## Limitations
+
+- This app is designed for research and educational use only.
+- It is not a substitute for medicinal chemistry judgment or clinical advice.
+- Structural alerts are a heuristic screen and not a comprehensive safety assessment.
+- SA scores and alert filtering are approximate and should be interpreted with domain expertise.
+
+## Disclaimer
+
+For research and educational use only. Not medical advice.
+
+## Third-party licenses
+
+- RDKit is distributed under a BSD-style open-source license.
+- Streamlit is distributed under a permissive open-source license.
+- Plotly is also open-source and used for interactive charts.
+- This project includes an MIT License for the application code.
