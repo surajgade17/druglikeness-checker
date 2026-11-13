@@ -12,7 +12,7 @@ FREE_TIER_LIMIT = 20
 
 
 def read_smiles_csv(uploaded_file: Any) -> pd.DataFrame:
-    """Read a CSV file that must contain a 'smiles' column."""
+    """Read a CSV file and validate that it contains a smiles column."""
     if uploaded_file is None:
         raise ValueError("A CSV file is required.")
     dataframe = pd.read_csv(uploaded_file)
@@ -22,30 +22,19 @@ def read_smiles_csv(uploaded_file: Any) -> pd.DataFrame:
 
 
 def process_batch_smiles(smiles_series: Series, limit: int = FREE_TIER_LIMIT) -> pd.DataFrame:
-    """Process a series of SMILES strings and return structured results.
-
-    The free tier is explicitly limited to 20 molecules; the app should surface a
-    friendly message when the user exceeds the limit.
-    """
+    """Process a series of SMILES strings and return formatted results."""
     if smiles_series is None:
         raise ValueError("A non-empty series of SMILES strings is required.")
 
     if len(smiles_series) > limit:
-        raise ValueError(f"Free tier supports up to {limit} molecules. Please reduce the dataset or use Pro.")
+        raise ValueError(f"Free tier supports up to {limit} molecules. Please reduce the dataset.")
 
     rows: list[dict[str, Any]] = []
     for index, value in smiles_series.items():
         smiles = str(value).strip()
         molecule, error = parse_smiles(smiles)
         if molecule is None or error:
-            rows.append(
-                {
-                    "index": index,
-                    "smiles": smiles,
-                    "status": "invalid",
-                    "error": error or "Invalid SMILES",
-                }
-            )
+            rows.append({"index": index, "smiles": smiles, "status": "invalid", "error": error or "Invalid SMILES"})
             continue
 
         properties = calculate_properties(molecule)

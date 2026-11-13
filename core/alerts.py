@@ -1,3 +1,4 @@
+"""Rule-of-five and complementary oral drug-likeness filters."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -8,7 +9,7 @@ from rdkit.Chem import Descriptors, Lipinski, rdMolDescriptors
 
 @dataclass(frozen=True)
 class RuleResult:
-    """Outcome and summary explanation for a drug-likeness rule."""
+    """Outcome and concise explanation for a molecular filter."""
 
     name: str
     passed: bool
@@ -17,7 +18,7 @@ class RuleResult:
 
 
 def lipinski(mw: float, logp: float, hbd: int, hba: int) -> RuleResult:
-    """Evaluate Lipinski's rule of five using common threshold checks."""
+    """Evaluate Lipinski's rule-of-five (at most one violation)."""
     failures = [
         label
         for label, bad in (
@@ -28,17 +29,16 @@ def lipinski(mw: float, logp: float, hbd: int, hba: int) -> RuleResult:
         )
         if bad
     ]
-    passed = len(failures) <= 1
     return RuleResult(
         "Lipinski",
-        passed,
+        len(failures) <= 1,
         "No violations" if not failures else "; ".join(failures),
         len(failures),
     )
 
 
 def veber(rotatable_bonds: int, tpsa: float) -> RuleResult:
-    """Evaluate Veber's oral availability criteria."""
+    """Evaluate Veber's oral bioavailability criteria."""
     failures = [
         label
         for label, bad in (
@@ -47,20 +47,11 @@ def veber(rotatable_bonds: int, tpsa: float) -> RuleResult:
         )
         if bad
     ]
-    return RuleResult(
-        "Veber",
-        not failures,
-        "No violations" if not failures else "; ".join(failures),
-        len(failures),
-    )
+    return RuleResult("Veber", not failures, "No violations" if not failures else "; ".join(failures), len(failures))
 
 
 def ghose(mw: float, logp: float, molar_refractivity: float, atoms: int) -> RuleResult:
-    """Evaluate the Ghose filter.
-
-    The Ghose filter is commonly stated as: 160 <= MW <= 480, -0.4 <= LogP <= 5.6,
-    40 <= MR <= 130, and 20 <= atom count <= 70.
-    """
+    """Evaluate Ghose filter ranges."""
     failures = [
         label
         for label, bad in (
@@ -71,16 +62,11 @@ def ghose(mw: float, logp: float, molar_refractivity: float, atoms: int) -> Rule
         )
         if bad
     ]
-    return RuleResult(
-        "Ghose",
-        not failures,
-        "All ranges satisfied" if not failures else "; ".join(failures),
-        len(failures),
-    )
+    return RuleResult("Ghose", not failures, "All ranges satisfied" if not failures else "; ".join(failures), len(failures))
 
 
 def egan(logp: float, tpsa: float) -> RuleResult:
-    """Evaluate the Egan filter."""
+    """Evaluate Egan's filter."""
     failures = [
         label
         for label, bad in (
@@ -89,16 +75,11 @@ def egan(logp: float, tpsa: float) -> RuleResult:
         )
         if bad
     ]
-    return RuleResult(
-        "Egan",
-        not failures,
-        "No violations" if not failures else "; ".join(failures),
-        len(failures),
-    )
+    return RuleResult("Egan", not failures, "No violations" if not failures else "; ".join(failures), len(failures))
 
 
 def muegge(mw: float, logp: float, tpsa: float, hbd: int, hba: int, rotors: int, rings: int) -> RuleResult:
-    """Evaluate a practical Muegge-type drug-likeness filter."""
+    """Evaluate commonly used Muegge filter bounds."""
     failures = [
         label
         for label, bad in (
@@ -112,16 +93,11 @@ def muegge(mw: float, logp: float, tpsa: float, hbd: int, hba: int, rotors: int,
         )
         if bad
     ]
-    return RuleResult(
-        "Muegge",
-        not failures,
-        "All ranges satisfied" if not failures else "; ".join(failures),
-        len(failures),
-    )
+    return RuleResult("Muegge", not failures, "All ranges satisfied" if not failures else "; ".join(failures), len(failures))
 
 
 def evaluate_rules(molecule: Chem.Mol) -> list[RuleResult]:
-    """Compute the main oral drug-likeness filters for a valid molecule."""
+    """Calculate all five rule checks for a valid molecule."""
     if molecule is None:
         raise ValueError("A valid RDKit molecule is required.")
 

@@ -1,73 +1,37 @@
-# DrugLikeness Checker
+import io
 
-A mobile-first Streamlit app for evaluating the drug-likeness and basic ADMET-style risk of small molecules directly from a SMILES string or a CSV file.
+import pandas as pd
 
-## Description
+from core.batch import process_batch_smiles
+from utils.validation import parse_smiles
 
-DrugLikeness Checker allows a user to paste a SMILES string or upload a CSV with a `smiles` column and instantly receive a report with:
 
-- molecule properties (MW, cLogP, TPSA, HBD, HBA, rotatable bonds, rings, heavy atoms, QED, SA score)
-- rule checks for Lipinski, Veber, Ghose, Egan, and Muegge
-- structural alerts from PAINS and Brenk filters
-- a radar chart and bar chart compared with ideal drug-like ranges
-- batch processing in a free tier
-- an optional Pro stub for larger workloads and advanced features
+def test_parse_smiles_handles_long_garbage() -> None:
+    molecule, error = parse_smiles("x" * 4096)
+    assert molecule is None and error is not None
 
-## Screenshots
 
-Placeholder screenshots:
+def test_process_batch_smiles_validates_expected_input() -> None:
+    series = pd.Series(["CCO", "CCN", "not a smiles"])
+    result = process_batch_smiles(series, limit=10)
+    assert len(result) == 3
+    assert result["status"].tolist() == ["ok", "ok", "invalid"]
 
-- Single-molecule analysis view
-- Batch CSV upload and results table
-- Pro features panel and comparison charts
 
-## Install
+def test_process_batch_smiles_rejects_items_over_limit() -> None:
+    series = pd.Series(["CCO"] * 21)
+    try:
+        process_batch_smiles(series, limit=20)
+        raise AssertionError("Expected value error for oversized batch")
+    except ValueError:
+        pass
 
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-streamlit run app.py
-```
 
-## Deployment
+def test_parse_smiles_handles_caffeine() -> None:
+    molecule, error = parse_smiles("Cn1c(=O)n(C)c(=O)c2ncn(C)c12")
+    assert molecule is not None and error is None
 
-This app is designed for deployment on Streamlit Community Cloud without extra setup.
 
-1. Push this repository to GitHub.
-2. Create a new app in Streamlit Community Cloud.
-3. Connect the repository and choose `app.py` as the main file.
-4. Ensure `requirements.txt` is present and includes the project dependencies.
-5. Optionally set an environment variable named `DRUGLIKENESS_PRO_KEY` for Pro feature gating.
-
-## Usage
-
-- Paste a SMILES into the single-molecule form.
-- Use the built-in example molecules or upload a CSV with a `smiles` column.
-- Review the pass/fail rule badges and structural alerts.
-- Download batch analysis results as a CSV.
-- For Pro features, provide a valid key to unlock the premium stub.
-
-## Pricing plan
-
-- Free tier: up to 20 molecules per batch
-- Pro tier: up to 5000 molecules, PDF export, and Tanimoto similarity search against a user-provided reference set
-- Payment integration and billing are intentionally left as a TODO in this starter/open-source version.
-
-## Limitations
-
-- This tool is intended for research and educational use only.
-- Structural alerts are heuristic filters; they do not replace medicinal chemistry review.
-- Drug-likeness is not a guarantee of efficacy, safety, or clinical suitability.
-- Some property calculations and alert systems are approximate and should be interpreted with domain expertise.
-
-## Disclaimer
-
-For research and educational use only. Not medical advice.
-
-## Third-party licenses
-
-- RDKit is distributed under a BSD-style open-source license.
-- Streamlit is open-source and used as the application framework.
-- Plotly is open-source and used for interactive visualization.
-- This application is distributed under the MIT license.
+def test_csv_like_input_is_not_smiles() -> None:
+    molecule, error = parse_smiles("smiles,CCO")
+    assert molecule is None and error is not None

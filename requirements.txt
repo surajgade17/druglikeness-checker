@@ -1,8 +1,6 @@
-# This file shows the final simple app version.
-# The project is intended for local use in VS Code or a Python environment.
-# It is intentionally free of the old Pro key gate.
-
-streamlit>=1.36,<2.0
-rdkit>=2024.3.1
-pandas>=2.0
-plotly>=5.20
+streamlit==1.36.0
+rdkit==2024.3.1
+pandas==2.2.3
+plotly==5.24.1
+pytest==8.3.3
+pillow==10.4.0
