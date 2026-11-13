@@ -16,9 +16,16 @@ def find_alerts(molecule: Chem.Mol) -> list[dict[str, str]]:
     """Return matching structural alert patterns."""
     if molecule is None:
         raise ValueError("A valid RDKit molecule is required.")
-    matches = []
+
+    matches: list[dict[str, str]] = []
     for entry in ALERT_PATTERNS:
         pattern = Chem.MolFromSmarts(entry["smarts"])
         if pattern is not None and molecule.HasSubstructMatch(pattern):
-            matches.append({"category": entry["category"], "alert": entry["alert"], "matched_substructure": entry["smarts"]})
+            matches.append(
+                {
+                    "category": entry["category"],
+                    "alert": entry["alert"],
+                    "matched_substructure": entry["smarts"],
+                }
+            )
     return matches
